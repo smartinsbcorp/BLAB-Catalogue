@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>German B Corps Catalogue</title>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #fdfaf6; color: #333; }
+    header { background-color: #fcdc00; padding: 20px; display: flex; align-items: center; gap: 20px; }
+    header img { height: 50px; }
+    header h1 { font-size: 24px; font-weight: bold; }
+    .filters { background: #f5f2eb; padding: 15px; display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+    .filters select, .filters input { padding: 8px; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 15px; position: relative; }
+    .card img { max-height: 60px; object-fit: contain; margin-bottom: 10px; }
+    .description { max-height: 100px; overflow: hidden; position: relative; transition: max-height 0.3s ease; }
+    .description.expanded { max-height: 400px; overflow: auto; }
+    .read-more { color: #0077cc; cursor: pointer; margin-top: 10px; font-size: 14px; font-weight:bold; }
+    .card-buttons a { display: inline-block; margin-right: 8px; font-size: 14px; color: #fff; background: #000; padding: 6px 10px; text-decoration: none; border-radius: 4px; }
+    .card-buttons a { margin-top: 10px; margin-right: 10px; font-size: 13px; background-color: #fcdc00; color: black; font-weight: bold; }
+    #modal img { max-width: 150px; height: auto; display: block; margin: 0 auto 10px; }
+</style>
+</head>
+<body>
+<script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+<script>
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({ pageLanguage: 'en', includedLanguages: 'de', layout: google.translate.TranslateElement.InlineLayout.SIMPLE }, 'google_translate_element');
+}
+</script>
+<header>
+<img src="https://via.placeholder.com/100" alt="B Lab Logo"/>
+<h1>German B Corps Catalogue</h1>
+<div id="google_translate_element" style="margin-left:auto;"></div>
+</header>
+<div class="filters">
+<input id="search" placeholder="Search by keyword..." type="text"/>
+<select id="stateFilter"><option value="">Filter by State</option></select>
+<select id="productsFilter"><option value="">Filter by Products and Services</option></select>
+</div>
+<div class="grid" id="cardGrid"></div>
+<div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:1000;">
+  <div style="background:white; padding:20px; max-width:600px; max-height:80%; overflow:auto; border-radius:10px; position:relative;">
+    <span id="modal-close" style="position:absolute; top:10px; right:15px; cursor:pointer; font-weight:bold;">×</span>
+    <div id="modal-content"></div>
+  </div>
+</div>
+<script>
+function loadData() {
+  fetch('data/companies.csv')
+    .then(r => r.text())
+    .then(text => {
+      const parsed = Papa.parse(text.trim(), {header: true}).data.filter(d => d.name);
+      buildGrid(parsed);
+      populateFilters(parsed);
+    });
+}
+function buildGrid(data) {
+  const grid = document.getElementById('cardGrid');
+  data.forEach(d => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.setAttribute('data-products', d.products);
+    card.setAttribute('data-state', d.state);
+    card.setAttribute('data-size', d.size);
+    card.innerHTML = `<img src="${d.logo_url}" alt="${d.name} Logo"/>`+
+                     `<h3>${d.name}</h3>`+
+                     `<div class="description">${d.description}</div>`+
+                     `<div class="read-more">Read more</div>`+
+                     `<div class="card-buttons"><a href="${d.website}" target="_blank">Website</a>`+
+                     `<a href="${d.bcorp_url}" target="_blank">B Corp Profile</a></div>`;
+    grid.appendChild(card);
+  });
+  attachCardEvents();
+}
+function populateFilters(data) {
+  const stateSelect = document.getElementById('stateFilter');
+  const productSelect = document.getElementById('productsFilter');
+  const states = [...new Set(data.map(d => d.state).filter(Boolean))].sort();
+  const products = [...new Set(data.map(d => d.products).filter(Boolean))].sort();
+  states.forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.textContent = s; stateSelect.appendChild(opt); });
+  products.forEach(p => { const opt = document.createElement('option'); opt.value = p; opt.textContent = p; productSelect.appendChild(opt); });
+  document.getElementById('search').addEventListener('input', filterCards);
+  stateSelect.addEventListener('change', filterCards);
+  productSelect.addEventListener('change', filterCards);
+}
+function filterCards() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const state = document.getElementById('stateFilter').value.toLowerCase();
+  const prod = document.getElementById('productsFilter').value.toLowerCase();
+  document.querySelectorAll('.card').forEach(card => {
+    const text = card.textContent.toLowerCase();
+    const cardState = card.getAttribute('data-state').toLowerCase();
+    const cardProd = card.getAttribute('data-products').toLowerCase();
+    const match = text.includes(search) &&
+                 (state === '' || cardState === state) &&
+                 (prod === '' || cardProd === prod);
+    card.style.display = match ? 'flex' : 'none';
+  });
+}
+function attachCardEvents() {
+  document.querySelectorAll('.read-more').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const card = this.parentElement;
+      const logo = card.querySelector('img').outerHTML;
+      const desc = card.querySelector('.description').innerHTML;
+      const links = card.querySelector('.card-buttons').outerHTML;
+      const size = card.getAttribute('data-size') || '';
+      const sizeText = size ? `<p><strong>Size:</strong> ${size} employees</p><br>` : '';
+      document.getElementById('modal-content').innerHTML = logo + '<br><br>' + sizeText + desc + '<br><br>' + links;
+      document.getElementById('modal').style.display = 'flex';
+    });
+  });
+}
+document.getElementById('modal-close').onclick = () => { document.getElementById('modal').style.display = 'none'; };
+window.onclick = (e) => { if (e.target === document.getElementById('modal')) { document.getElementById('modal').style.display = 'none'; } };
+loadData();
+</script>
+<footer style="background-color: #000; color: #fff; padding: 40px 20px; font-size: 14px;">
+<div style="max-width: 1000px; margin: auto; display: flex; flex-wrap: wrap; justify-content: space-between;">
+<div style="flex: 1 1 300px; margin-bottom: 20px;">
+<h3 style="color: #fcdc00;">About B Lab Germany</h3>
+<p>B Lab is a nonprofit network transforming the global economy to benefit all people, communities, and the planet.</p>
+</div>
+<div style="flex: 1 1 150px; margin-bottom: 20px;">
+<h3 style="color: #fcdc00;">Explore</h3>
+<ul style="list-style: none; padding: 0;">
+<li><a href="https://www.bcorporation.de/zertifizierung" style="color: #fff; text-decoration: underline;">Certification</a></li>
+<li><a href="https://www.bcorporation.de/unternehmen" style="color: #fff; text-decoration: underline;">Companies</a></li>
+<li><a href="https://www.bcorporation.de/aktuelles" style="color: #fff; text-decoration: underline;">News</a></li>
+<li><a href="https://www.bcorporation.de/news-events/newsletter/" style="color: #fff; text-decoration: underline;">Newsletter</a></li>
+<li><a href="https://www.bcorporation.de/kontakt" style="color: #fff; text-decoration: underline;">Contact</a></li>
+</ul>
+</div>
+<div style="flex: 1 1 200px; margin-bottom: 20px;">
+<h3 style="color: #fcdc00;">Follow Us</h3>
+<a href="https://www.linkedin.com/company/b-lab-germany/" style="color: #fff; text-decoration: underline;" target="_blank">LinkedIn</a><br/>
+<a href="https://www.instagram.com/blabgermany/" style="color: #fff; text-decoration: underline;" target="_blank">Instagram</a>
+</div>
+</div>
+<hr style="border-color: #555; margin: 20px 0;"/>
+<p style="text-align: center; font-size: 12px; margin-top: 10px;">Made by <a href="https://www.linkedin.com/in/samaradesena/" style="color: #fcdc00; font-weight: bold;" target="_blank">Samara – AKA The Intern</a></p>
+</footer>
+</body>
+</html>
